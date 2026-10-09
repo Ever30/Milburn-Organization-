@@ -25,7 +25,7 @@ if(!ok)document.getElementById('app').innerHTML='<h1>Almost ready</h1><p>'+(type
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const C={green:['Good','#1E7B3A'],yellow:['Needs maintenance','#F2B705'],red:['Out of service','#C62828']};
 let ADMIN=location.hash==='#admin',items=[],st={},sess=null,msg='',done=false,conf=null;
-let d={item:null,floor:null,cond:null,note:''},name=localStorage.getItem('name')||'';
+let d={item:null,floor:null,cond:null,note:''},name='';
 const pill=c=>c?`<span class="dot" style="background:${C[c][1]}"></span>${C[c][0]}`:'<span class="m">No report yet</span>';
 async function load(){
  const a=await sb.from('items').select('*').order('name'),b=await sb.from('status').select('*');
@@ -60,7 +60,7 @@ window.addEventListener('hashchange',()=>{ADMIN=location.hash==='#admin';load()}
 const val=id=>document.getElementById(id).value.trim();
 async function act(a,v){
  msg='';
- if(a==='name'){name=val('nm');if(name)localStorage.setItem('name',name)}
+ if(a==='name'){name=val('nm');}
  else if(a==='item')d.item=v;else if(a==='floor')d.floor=+v;else if(a==='cond')d.cond=v;
  else if(a==='again'){done=false;d={item:null,floor:null,cond:null,note:''}}
  else if(a==='send')return send();
