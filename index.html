@@ -8,7 +8,7 @@ h1{font-size:34px;margin:0 0 8px}h2{font-size:24px;margin:24px 0 10px}
 button{font:600 20px system-ui,sans-serif;min-height:56px;border-radius:8px;border:2px solid #9AA3AB;background:#fff;color:#14181C;padding:0 16px;width:100%;margin-bottom:8px;text-align:left}
 .sel{background:#14181C;color:#fff;border:2px solid #14181C}.dim{opacity:.4}.p{background:#1F4E79;color:#fff;border:0;text-align:center;min-height:64px}
 .g{background:#1E7B3A;color:#fff;border:0}.y{background:#F2B705;border:0}.r{background:#C62828;color:#fff;border:0}.g.sel,.y.sel,.r.sel{border:6px solid #14181C}.y.sel{color:#14181C}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.grid button{text-align:center;margin:0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.grid button{text-align:center;margin:0}
 input,textarea,select{width:100%;box-sizing:border-box;font:20px system-ui,sans-serif;padding:12px;border:2px solid #14181C;border-radius:8px;margin-bottom:10px}
 .card{background:#fff;border:1px solid #C9CED3;border-radius:8px;padding:12px 14px;margin-bottom:10px}
 .m{color:#4A545C;font-size:16px}.big{text-align:center;font-size:28px;padding:40px 0}
@@ -24,12 +24,12 @@ const sb=ok?supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 if(!ok)document.getElementById('app').innerHTML='<h1>Almost ready</h1><p>'+(typeof supabase==='undefined'?'The Supabase library did not load. Open this page from your GitHub link with internet.':'Open index.html in a text editor and paste your Project URL and anon key at the top (Part 2).')+'</p>';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const C={green:['Good','#1E7B3A'],yellow:['Needs maintenance','#F2B705'],red:['Out of service','#C62828']};
-let ADMIN=location.hash==='#admin',items=[],st={},sess=null,msg='',done=false,conf=null;
+let ADMIN=location.hash==='#admin',items=[],st={},sess=null,msg='',done=false,conf=null,fl=[],tab='floors',sel=null;
 let d={item:null,floor:null,cond:null,note:''},name='';
 const pill=c=>c?`<span class="dot" style="background:${C[c][1]}"></span>${C[c][0]}`:'<span class="m">No report yet</span>';
 async function load(){
- const a=await sb.from('items').select('*').order('name'),b=await sb.from('status').select('*');
- items=a.data||[];st={};(b.data||[]).forEach(x=>st[x.item_id]=x);
+ const a=await sb.from('items').select('*').order('name'),b=await sb.from('status').select('*'),c=await sb.from('floors').select('*').order('sort');
+ items=a.data||[];fl=c.data||[];st={};(b.data||[]).forEach(x=>st[x.item_id]=x);
  if(ADMIN)sess=(await sb.auth.getSession()).data.session;
  render();
 }
@@ -39,19 +39,26 @@ function worker(){
  const b=(k,cls,t)=>`<button class="${cls} ${d.cond===k?'sel':d.cond?'dim':''}" data-a="cond" data-v="${k}">${d.cond===k?'✓ ':''}${t}</button>`;
  return `<h1>Hi, ${esc(name)}</h1>
  <h2>1. What did you use?</h2>${items.map(i=>`<button class="${d.item===i.id?'sel':''}" data-a="item" data-v="${i.id}">${esc(i.name)}</button>`).join('')}
- <h2>2. What floor?</h2><div class="grid">${[1,2,3,4,5,6,7,8].map(f=>`<button class="${d.floor===f?'sel':''}" data-a="floor" data-v="${f}">${f}</button>`).join('')}</div>
+ <h2>2. What floor?</h2><div class="grid">${fl.map(f=>`<button class="${d.floor===f.name?'sel':''}" data-a="floor" data-v="${esc(f.name)}">${esc(f.name)}</button>`).join('')}</div>
  <h2>3. Does it work?</h2>${b('green','g','Yes')}${b('yellow','y','Needs maintenance')}${b('red','r','Out of service')}
  ${d.cond&&d.cond!=='green'?`<textarea id="note" rows="3" placeholder="What is the problem?">${esc(d.note)}</textarea>`:''}
  ${msg?`<p style="background:#fff;border:3px solid #C62828;border-radius:8px;padding:10px"><b>${esc(msg)}</b></p>`:''}<button class="p" data-a="send">Send</button>`;
 }
+function loc(i){const s=st[i.id];return s&&fl.some(f=>f.name===s.floor)?s.floor:null}
+function row(i,sf,x){const s=st[i.id],bad=s&&s.cond!=='green';return `<div class="card"${bad?` style="border-left:10px solid ${C[s.cond][1]}"`:''}><b>${esc(i.name)}</b>${i.kind==='machine'&&(i.attachments||[]).length?` <span class="m">(${esc(i.attachments.join(', '))})</span>`:''}<br>${pill(s&&s.cond)}${s?` <span class="m">· ${sf?esc(s.floor)+' · ':''}${esc(s.by_name)} · ${new Date(s.at).toLocaleString()}</span>`:''}${s&&s.note?`<p>${esc(s.note)}</p>`:''}${bad?`<br><button data-a="fix" data-v="${i.id}" style="margin-top:8px">Mark fixed</button>`:''}${x||''}</div>`}
 function admin(){
  if(!sess)return `<h1>Administrator</h1>${msg?`<p><b>${esc(msg)}</b></p>`:''}<input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="p" data-a="login">Log in</button>`;
  const bad=items.filter(i=>st[i.id]&&st[i.id].cond!=='green');
- return `<h1>Equipment status</h1>${msg?`<p><b>${esc(msg)}</b></p>`:''}
- <h2>Needs attention (${bad.length})</h2>${bad.map(i=>{const s=st[i.id];return `<div class="card" style="border-left:10px solid ${C[s.cond][1]}"><b>${esc(i.name)} · Floor ${s.floor}</b><br>${pill(s.cond)}<p>${esc(s.note)}</p><span class="m">${esc(s.by_name)} · ${new Date(s.at).toLocaleString()}</span><button data-a="fix" data-v="${i.id}" style="margin-top:8px">Mark fixed</button></div>`}).join('')||'<p class="m">Nothing needs attention.</p>'}
- <h2>All equipment</h2>${items.map(i=>{const s=st[i.id];return `<div class="card"><b>${esc(i.name)}</b> ${i.kind==='machine'?'<span class="m">('+esc((i.attachments||[]).join(', '))+')</span>':''}<br>${pill(s&&s.cond)} <span class="m">${s?'· Floor '+s.floor+' · '+esc(s.by_name):''}</span><button data-a="rm" data-v="${i.id}" style="margin-top:8px;color:#C62828;border-color:#C62828">${conf===i.id?'Tap again to remove':'Remove'}</button></div>`}).join('')}
- <h2>Add equipment</h2><select id="nk"><option value="machine">Machine</option><option value="tool">Tool</option></select><input id="nn" placeholder="Name (example: Skid steer 4)"><input id="na" placeholder="Attachments, separated by commas"><button class="p" data-a="add">Add</button>
- <button data-a="out" style="margin-top:24px">Log out</button><button data-a="refresh">Refresh</button>`;
+ const T=[['floors','Floors'],['attn','Attention ('+bad.length+')'],['equip','Equipment'],['setup','Floor setup']];
+ let h=`<h1>Administrator</h1>${msg?`<p><b>${esc(msg)}</b></p>`:''}<div class="grid" style="margin-bottom:12px">${T.map(t=>`<button class="${tab===t[0]?'p':''}" style="text-align:center" data-a="tab" data-v="${t[0]}">${t[1]}</button>`).join('')}</div>`;
+ const at=n=>items.filter(i=>n==='__none'?!loc(i):loc(i)===n);
+ if(tab==='floors'){
+  if(sel!==null){const its=at(sel);h+=`<button data-a="back">← All floors</button><h2>${sel==='__none'?'No report yet':esc(sel)} (${its.length})</h2>`+(its.map(i=>row(i,false)).join('')||'<p class="m">Nothing here.</p>')}
+  else{h+='<h2>Floors</h2>'+fl.map(f=>f.name).concat('__none').map(n=>{const its=at(n);if(n==='__none'&&!its.length)return '';const b=its.filter(i=>st[i.id]&&st[i.id].cond!=='green'),w=b.some(i=>st[i.id].cond==='red')?'red':'yellow';return `<button data-a="open" data-v="${esc(n)}"><b>${n==='__none'?'No report yet':esc(n)}</b> <span class="m">· ${its.length} item${its.length===1?'':'s'}</span>${b.length?`<br><span class="dot" style="background:${C[w][1]}"></span><span class="m">${b.length} need attention</span>`:''}</button>`}).join('')}
+ }else if(tab==='attn'){h+=`<h2>Needs attention (${bad.length})</h2>`+(bad.map(i=>row(i,true)).join('')||'<p class="m">Nothing needs attention.</p>')}
+ else if(tab==='equip'){h+='<h2>All equipment</h2>'+items.map(i=>row(i,true,`<br><button data-a="rm" data-v="${i.id}" style="margin-top:8px;color:#C62828;border-color:#C62828">${conf===i.id?'Tap again to remove':'Remove'}</button>`)).join('')+`<h2>Add equipment</h2><select id="nk"><option value="machine">Machine</option><option value="tool">Tool</option></select><input id="nn" placeholder="Name (example: Skid steer 4)"><input id="na" placeholder="Attachments, separated by commas"><button class="p" data-a="add">Add</button>`}
+ else{h+='<h2>Floors</h2>'+fl.map(f=>`<div class="card"><b>${esc(f.name)}</b><br><button data-a="rmfl" data-v="${f.id}" style="margin-top:8px;color:#C62828;border-color:#C62828">${conf===f.id?'Tap again to remove':'Remove'}</button></div>`).join('')+`<h2>Add a floor</h2><input id="fn" placeholder="Example: Basement, Roof, Floor 9"><button class="p" data-a="addfl">Add floor</button><p class="m">New floors are added at the end of the list.</p>`}
+ return h+`<button data-a="refresh" style="margin-top:24px">Refresh</button><button data-a="out">Log out</button>`;
 }
 function render(){document.getElementById('app').innerHTML=ADMIN?admin():worker();if(done)window.scrollTo(0,0)}
 document.addEventListener('input',e=>{if(e.target.id==='note')d.note=e.target.value});
@@ -61,7 +68,7 @@ const val=id=>document.getElementById(id).value.trim();
 async function act(a,v){
  msg='';
  if(a==='name'){name=val('nm');}
- else if(a==='item')d.item=v;else if(a==='floor')d.floor=+v;else if(a==='cond')d.cond=v;
+ else if(a==='item')d.item=v;else if(a==='floor')d.floor=v;else if(a==='cond')d.cond=v;
  else if(a==='again'){done=false;d={item:null,floor:null,cond:null,note:''}}
  else if(a==='send')return send();
  else if(a==='login'){const r=await sb.auth.signInWithPassword({email:val('em'),password:val('pw')});if(r.error)msg='Wrong email or password.';return load()}
@@ -69,6 +76,10 @@ async function act(a,v){
  else if(a==='refresh')return load();
  else if(a==='fix'){await sb.from('status').update({cond:'green',note:''}).eq('item_id',v);return load()}
  else if(a==='rm'){if(conf!==v){conf=v}else{await sb.from('items').delete().eq('id',v);conf=null;return load()}}
+ else if(a==='tab'){tab=v;sel=null;conf=null}
+ else if(a==='open')sel=v;else if(a==='back')sel=null;
+ else if(a==='addfl'){const n=val('fn');if(!n)msg='Write a floor name.';else{const r=await sb.from('floors').insert({name:n,sort:Math.max(-1,...fl.map(f=>f.sort))+1});if(r.error)msg='Could not add.';return load()}}
+ else if(a==='rmfl'){if(conf!==v){conf=v}else{await sb.from('floors').delete().eq('id',v);conf=null;return load()}}
  else if(a==='add'){const n=val('nn'),k=val('nk');if(!n)msg='Write a name.';else{const r=await sb.from('items').insert({name:n,kind:k,attachments:k==='machine'?val('na').split(',').map(s=>s.trim()).filter(Boolean):[]});if(r.error)msg='Could not add.';return load()}}
  render();
 }
